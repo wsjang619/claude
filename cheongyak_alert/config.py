@@ -29,6 +29,7 @@ class Settings:
     applyhome: dict = field(default_factory=dict)
     lh: dict = field(default_factory=dict)
     state_path: Path = Path("state/seen.json")
+    mail_to: str = ""
 
 
 def load(path: str | Path) -> Settings:
@@ -58,6 +59,7 @@ def load(path: str | Path) -> Settings:
         applyhome=raw.get("applyhome", {}),
         lh=raw.get("lh", {}),
         state_path=Path(raw.get("state", {}).get("path", "state/seen.json")),
+        mail_to=raw.get("mail", {}).get("to", ""),
     )
 
 
@@ -70,7 +72,7 @@ class MailEnv:
     to: str
 
     @classmethod
-    def from_env(cls) -> "MailEnv":
+    def from_env(cls, default_to: str = "") -> "MailEnv":
         missing = [k for k in ("SMTP_USER", "SMTP_PASSWORD") if not os.environ.get(k)]
         if missing:
             raise ValueError(f"환경변수 {', '.join(missing)} 가 필요합니다")
@@ -80,5 +82,5 @@ class MailEnv:
             port=int(os.environ.get("SMTP_PORT") or 465),
             user=user,
             password=os.environ["SMTP_PASSWORD"],
-            to=os.environ.get("MAIL_TO") or user,
+            to=os.environ.get("MAIL_TO") or default_to or user,
         )

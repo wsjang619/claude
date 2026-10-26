@@ -10,6 +10,8 @@ from cheongyak_alert.http import normalize_key
 from cheongyak_alert.lh import LhSource
 from cheongyak_alert.models import SourceError, parse_date
 from cheongyak_alert.state import State
+from cheongyak_alert.summary import links, summarize
+from cheongyak_alert.config import MailEnv
 
 TODAY = date(2026, 10, 26)
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,13 +20,14 @@ APT_ROWS = [
     {"HOUSE_MANAGE_NO": "1", "PBLANC_NO": "10", "HOUSE_NM": "별내 테스트 파크", "HOUSE_SECD_NM": "APT",
      "HSSPLY_ADRES": "경기도 남양주시 별내동 100", "TOT_SUPLY_HSHLDCO": "512", "RCRIT_PBLANC_DE": "2026-10-20",
      "SPSPLY_RCEPT_BGNDE": "2026-11-02", "RCEPT_BGNDE": "2026-11-03", "RCEPT_ENDDE": "2026-11-05",
-     "PRZWNER_PRESNATN_DE": "2026-11-11", "BSNS_MBY_NM": "테스트건설", "PBLANC_URL": "https://example.com/1"},
+     "PRZWNER_PRESNATN_DE": "2026-11-11", "BSNS_MBY_NM": "테스트건설", "PBLANC_URL": "https://example.com/1", "HMPG_ADRES": "www.byeolnae-park.example"},
     {"HOUSE_MANAGE_NO": "2", "PBLANC_NO": "20", "HOUSE_NM": "남양주 왕숙 테스트", "HSSPLY_ADRES": "경기도 남양주시 진건읍 1",
      "RCRIT_PBLANC_DE": "2026-10-01", "RCEPT_BGNDE": "2026-10-10", "RCEPT_ENDDE": "2026-10-12"},   # 이미 마감
     {"HOUSE_MANAGE_NO": "3", "PBLANC_NO": "30", "HOUSE_NM": "수원 테스트", "HSSPLY_ADRES": "경기도 수원시 1",
      "RCRIT_PBLANC_DE": "2026-10-20", "RCEPT_BGNDE": "2026-11-03", "RCEPT_ENDDE": "2026-11-05"},   # 무관한 지역
 ]
-MDL_ROWS = [{"NWWDS_HSHLDCO": "20", "LFE_FRST_HSHLDCO": "8"}, {"NWWDS_HSHLDCO": "15", "LFE_FRST_HSHLDCO": "0"}]
+MDL_ROWS = [{"NWWDS_HSHLDCO": "20", "LFE_FRST_HSHLDCO": "8", "HOUSE_TY": "059.9900A", "LTTOT_TOP_AMOUNT": "65000"},
+            {"NWWDS_HSHLDCO": "15", "LFE_FRST_HSHLDCO": "0", "HOUSE_TY": "084.9500B", "LTTOT_TOP_AMOUNT": "89500"}]
 LH_PAYLOAD = [
     {"dsSch": [{"PG_SZ": "200"}]},
     {"dsList": [
@@ -146,6 +149,74 @@ class MailTests(Base):
         res.entries[0].match.notice.title = "<script>x</script> 별내"
         html = mailer.build_html(res.entries, None, TODAY, [])
         self.assertNotIn("<script>", html)
+
+
+class SummaryTests(Base):
+    def entries(self):
+        return runner.collect(self.sources, self.cfg, self.state, TODAY).entries
+
+    def test_summary_sentence(self):
+        n = self.entries()[0].match.notice
+        text = summarize(n, TODAY)
+        self.assertIn("경기도 남양주시 별내동 100의 512세대 규모 APT 분양 공고입니다.", text)
+        self.assertIn("11/2(월)~11/5(목)", text)
+        self.assertIn("접수 시작까지 D-7", text)
+        self.assertIn("당첨자 발표는 11/11(수)", text)
+        self.assertIn("신혼부부 35세대", text)
+
+    def test_type_and_price_rows(self):
+        n = self.entries()[0].match.notice
+        self.assertEqual(n.extras["전용면적"], "59.99~84.95㎡ (2개 주택형)")
+        self.assertEqual(n.extras["분양가(최고가)"], "6.5억원 ~ 8.95억원")
+
+    def test_links(self):
+        e = self.entries()
+        apt = dict(links(e[0].match.notice))
+        self.assertEqual(apt["공고 상세"], "https://example.com/1")
+        self.assertEqual(apt["단지 홈페이지"], "http://www.byeolnae-park.example")
+        self.assertIn("applyhome.co.kr", apt["청약홈 (신청·일정)"])
+        self.assertTrue(apt["지도에서 보기"].startswith("https://map.naver.com/p/search/%EA%B2%BD%EA%B8%B0"))
+        lh = dict(links(e[1].match.notice))
+        self.assertEqual(lh["공고 상세"], "https://apply.lh.or.kr/x")
+        self.assertIn("LH청약플러스", lh)
+
+    def test_mail_contains_summary_links_overview(self):
+        msg = mailer.build_message(self.entries(), self.cfg.profile, TODAY, [], "a@b.c", "d@e.f")
+        text, html = msg.get_body(("plain",)).get_content(), msg.get_body(("html",)).get_content()
+        for body in (text, html):
+            self.assertIn("한눈에 보기", body)
+            self.assertIn("https://example.com/1", body)
+            self.assertIn("https://apply.lh.or.kr/x", body)
+            self.assertIn("map.naver.com", body)
+        self.assertIn("요약: 경기도 남양주시 별내동 100의", text)
+        self.assertIn("공고 상세", html)
+
+
+class MailEnvTests(unittest.TestCase):
+    def setUp(self):
+        import os
+        self.env = {k: os.environ.pop(k, None) for k in ("SMTP_USER", "SMTP_PASSWORD", "MAIL_TO")}
+        os.environ.update(SMTP_USER="sender@gmail.com", SMTP_PASSWORD="pw")
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        import os
+        for k, v in self.env.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+
+    def test_recipient_from_config(self):
+        cfg = load(ROOT / "config.toml")
+        self.assertEqual(cfg.mail_to, "jos5324@gmail.com")
+        self.assertEqual(MailEnv.from_env(cfg.mail_to).to, "jos5324@gmail.com")
+
+    def test_env_override_and_blank_secret(self):
+        import os
+        os.environ["MAIL_TO"] = ""                       # 비어 있는 GitHub secret
+        self.assertEqual(MailEnv.from_env("jos5324@gmail.com").to, "jos5324@gmail.com")
+        os.environ["MAIL_TO"] = "other@example.com"
+        self.assertEqual(MailEnv.from_env("jos5324@gmail.com").to, "other@example.com")
 
 
 class ProfileTests(Base):

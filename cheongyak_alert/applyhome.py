@@ -1,6 +1,7 @@
 """한국부동산원 청약홈 분양정보 (공공데이터포털 ApplyhomeInfoDetailSvc)."""
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Callable
 
@@ -122,6 +123,8 @@ class ApplyhomeSource:
                         n.extras["_manage_no"] = str(row.get("HOUSE_MANAGE_NO"))
                         n.extras["_pblanc_no"] = str(row.get("PBLANC_NO"))
                         n.extras["_endpoint"] = endpoint
+                        if home := (row.get("HMPG_ADRES") or "").strip():
+                            n.extras["_homepage"] = home if home.startswith("http") else f"http://{home}"
                         notices.append(n)
             except SourceError as e:
                 errors.append(f"청약홈 {endpoint}: {e}")
@@ -138,7 +141,29 @@ class ApplyhomeSource:
             })
         except SourceError:
             return
+        self._add_type_summary(notice, rows)
         for label, field_name in SPECIAL_FIELDS.items():
             total = sum(_int(r.get(field_name)) or 0 for r in rows)
             if total:
                 notice.special_supply[label] = total
+
+    @staticmethod
+    def _add_type_summary(notice: Notice, rows: list[dict]) -> None:
+        """주택형(전용면적)과 분양가(최고가 기준, 만원 단위) 범위를 요약 행으로 추가."""
+        areas = sorted({a for r in rows if (a := _area(r.get("HOUSE_TY")))})
+        prices = sorted(p for r in rows if (p := _int(r.get("LTTOT_TOP_AMOUNT"))))
+        if areas:
+            notice.extras["전용면적"] = f"{areas[0]:g}㎡" if len(areas) == 1 else f"{areas[0]:g}~{areas[-1]:g}㎡ ({len(areas)}개 주택형)"
+        if prices:
+            lo, hi = _eok(prices[0]), _eok(prices[-1])
+            notice.extras["분양가(최고가)"] = lo if lo == hi else f"{lo} ~ {hi}"
+
+
+def _area(v: object) -> float | None:
+    """주택형 '084.9500A' -> 84.95"""
+    m = re.match(r"\s*(\d+(?:\.\d+)?)", str(v or ""))
+    return round(float(m.group(1)), 2) if m and float(m.group(1)) > 0 else None
+
+
+def _eok(man_won: int) -> str:
+    return f"{man_won / 10000:.2f}".rstrip("0").rstrip(".") + "억원"

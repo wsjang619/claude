@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     today = date.fromisoformat(args.today) if args.today else datetime.now(KST).date()
 
     if args.test_mail:
-        env = MailEnv.from_env()
+        env = MailEnv.from_env(cfg.mail_to)
         msg = mailer.build_message(sample_entries(cfg, today), cfg.profile, today, [], env.user, env.to)
         mailer.send_smtp(msg, env)
         print(f"테스트 메일 발송 완료 -> {env.to}")
@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
             print("\n" + mailer.build_subject(res.entries) + "\n")
             print(mailer.build_text(res.entries, cfg.profile, today, res.errors))
         else:
-            env = MailEnv.from_env()
+            env = MailEnv.from_env(cfg.mail_to)
             msg = mailer.build_message(res.entries, cfg.profile, today, res.errors, env.user, env.to)
             mailer.send_smtp(msg, env)    # 실패하면 예외 -> 상태를 저장하지 않아 다음 실행에서 재시도
             print(f"메일 발송 완료 -> {env.to}")

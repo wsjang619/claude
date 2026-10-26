@@ -10,6 +10,7 @@ from html import escape
 from .config import MailEnv
 from .matcher import Match
 from .profile import Profile
+from .summary import fmt_date as _fmt_date, links, summarize
 
 
 @dataclass
@@ -64,10 +65,22 @@ def build_subject(entries: list[Entry]) -> str:
     return f"{prefix} — {head.notice.title}{more}"
 
 
+def _oneline(e: Entry) -> str:
+    n = e.match.notice
+    when = f"접수 {_fmt_date(n.receipt_start)}" if n.receipt_start else (
+        f"~{_fmt_date(n.receipt_end)} 마감" if n.receipt_end else "일정 확인")
+    return f"[{'임박' if e.reminder else '신규'}] {e.match.area.name} · {n.title} · {when}"
+
+
 def build_text(entries: list[Entry], profile: Profile | None, today: date, errors: list[str]) -> str:
     out: list[str] = []
+    if len(entries) > 1:
+        out += ["한눈에 보기"] + [f"  - {_oneline(e)}" for e in entries] + [""]
     for e in entries:
-        out += [_heading(e)] + [f"  {k}: {v}" for k, v in _rows(e, today)] + [f"  {e.match.notice.url}", ""]
+        n = e.match.notice
+        out += [_heading(e), f"  요약: {summarize(n, today, e.reminder)}", ""]
+        out += [f"  {k}: {v}" for k, v in _rows(e, today)]
+        out += ["  링크"] + [f"    {name}: {url}" for name, url in links(n)] + [""]
     if profile and (hints := profile.hints(today)):
         out += ["내 조건 체크 (참고용, 최종 자격은 공고문 기준)"] + [f"  - {h}" for h in hints] + [""]
     if errors:
@@ -75,8 +88,15 @@ def build_text(entries: list[Entry], profile: Profile | None, today: date, error
     return "\n".join(out)
 
 
+def _link_html(n) -> str:
+    return " &nbsp;|&nbsp; ".join(f"<a href='{escape(u, quote=True)}'>{escape(name)}</a>" for name, u in links(n))
+
+
 def build_html(entries: list[Entry], profile: Profile | None, today: date, errors: list[str]) -> str:
     cards = []
+    if len(entries) > 1:
+        items = "".join(f"<li>{escape(_oneline(e))}</li>" for e in entries)
+        cards.append(f"<div style='font-size:14px;margin:0 0 14px'><b>한눈에 보기</b><ul style='margin:4px 0;padding-left:18px'>{items}</ul></div>")
     for e in entries:
         n = e.match.notice
         color = "#d9480f" if e.reminder else "#1c7ed6"
@@ -89,8 +109,10 @@ def build_html(entries: list[Entry], profile: Profile | None, today: date, error
             f"<div><span style='background:{color};color:#fff;border-radius:4px;padding:1px 6px;font-size:12px'>{tag}</span> "
             f"<span style='color:#495057;font-size:12px'>{escape(e.match.area.name)}</span></div>"
             f"<div style='font-size:17px;font-weight:700;margin:6px 0 8px'>{escape(n.title)}</div>"
+            f"<div style='font-size:14px;line-height:1.6;background:#f1f3f5;border-radius:6px;padding:8px 10px;margin-bottom:8px'>"
+            f"{escape(summarize(n, today, e.reminder))}</div>"
             f"<table style='font-size:14px;border-collapse:collapse'>{rows}</table>"
-            f"<div style='margin-top:8px'><a href='{escape(n.url, quote=True)}'>공고 보기</a></div></div>")
+            f"<div style='margin-top:10px;font-size:14px'>{_link_html(n)}</div></div>")
     extra = ""
     if profile and (hints := profile.hints(today)):
         items = "".join(f"<li>{escape(h)}</li>" for h in hints)

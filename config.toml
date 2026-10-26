@@ -5,6 +5,9 @@ lookback_days = 60          # 최근 며칠 이내 모집공고까지 조회할�
 include_closed = false      # 접수가 이미 끝난 공고도 알릴지
 remind_days_before = 1      # 접수 시작 N일 전(당일 포함)에 한 번 더 알림
 
+[mail]
+to = "jos5324@gmail.com"          # 알림 수신 주소 (환경변수 MAIL_TO가 있으면 그쪽이 우선)
+
 # 별내동에 가까울수록 rank가 작다. 공고명+주소에 keywords 중 하나라도 있으면 해당 지역으로 분류한다.
 [[areas]]
 name = "별내동"
