@@ -51,3 +51,51 @@ region_code = "41"                       # 경기도
 
 [state]
 path = "state/seen.json"
+
+# ── 전세 매물 알림 (python -m cheongyak_alert --listings) ──────────────────
+[listings]
+enabled = true
+max_items_per_mail = 30          # 한 번에 메일에 싣는 최대 건수 (나머지는 건수만 표시)
+state_path = "state/listings.json"
+
+[listings.criteria]
+real_estate_types = ["APT", "VL"]   # APT 아파트 / VL 빌라·연립·다세대주택
+max_deposit = 30000                 # 전세 보증금 상한 (만원) = 3억
+area_min = 59                       # 전용면적 (㎡)
+area_max = 85
+
+[listings.naver]
+delay_seconds = 2                   # 요청 사이 대기. 차단을 피하려고 줄이지 않는 것을 권장
+
+[listings.market]
+enabled = true                      # 메일에 국토부 전세 실거래 시세 참고를 붙임 (DATA_GO_KR_SERVICE_KEY 필요)
+months = 3
+
+# 청약 알림의 areas와 같은 생활권. path는 경기도 아래 (시군구, 읍면동) 이름, lawd_cd는 시군구 코드.
+[[listings.areas]]
+name = "별내동"
+rank = 1
+path = ["남양주시", "별내동"]
+lawd_cd = "41360"
+dong = "별내동"
+
+[[listings.areas]]
+name = "다산동"
+rank = 2
+path = ["남양주시", "다산동"]
+lawd_cd = "41360"
+dong = "다산동"
+
+[[listings.areas]]
+name = "퇴계원읍"
+rank = 2
+path = ["남양주시", "퇴계원읍"]
+lawd_cd = "41360"
+dong = "퇴계원읍"
+
+[[listings.areas]]
+name = "구리 갈매동"
+rank = 3
+path = ["구리시", "갈매동"]
+lawd_cd = "41310"
+dong = "갈매동"

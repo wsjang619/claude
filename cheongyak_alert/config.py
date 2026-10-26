@@ -9,6 +9,7 @@ from pathlib import Path
 from .matcher import Area
 from .models import parse_date
 from .profile import Profile
+from .realestate import Criteria, ListingArea
 
 
 def _month(value: str) -> date | None:
@@ -17,6 +18,18 @@ def _month(value: str) -> date | None:
         return None
     parts = str(value).split("-")
     return date(int(parts[0]), int(parts[1]), int(parts[2]) if len(parts) > 2 else 1)
+
+
+@dataclass
+class ListingSettings:
+    enabled: bool = True
+    criteria: Criteria = field(default_factory=Criteria)
+    areas: list[ListingArea] = field(default_factory=list)
+    max_items_per_mail: int = 30
+    delay_seconds: float = 2.0
+    market_enabled: bool = True
+    market_months: int = 3
+    state_path: Path = Path("state/listings.json")
 
 
 @dataclass
@@ -30,6 +43,7 @@ class Settings:
     lh: dict = field(default_factory=dict)
     state_path: Path = Path("state/seen.json")
     mail_to: str = ""
+    listings: ListingSettings = field(default_factory=ListingSettings)
 
 
 def load(path: str | Path) -> Settings:
@@ -50,6 +64,20 @@ def load(path: str | Path) -> Settings:
             extra_dependents=int(p.get("extra_dependents", 0)),
             account_open=_month(p.get("account_open", "")),
         )
+    L = raw.get("listings", {})
+    c = L.get("criteria", {})
+    criteria = Criteria(types=tuple(c.get("real_estate_types", ["APT", "VL"])),
+                        max_deposit=int(c.get("max_deposit", 30000)),
+                        area_min=float(c.get("area_min", 59)), area_max=float(c.get("area_max", 85)))
+    listings = ListingSettings(
+        enabled=bool(L.get("enabled", True)), criteria=criteria,
+        areas=[ListingArea(a["name"], int(a["rank"]), tuple(a.get("path", ())), a.get("cortar_no", ""),
+                           a.get("lawd_cd", ""), a.get("dong", "")) for a in L.get("areas", [])],
+        max_items_per_mail=int(L.get("max_items_per_mail", 30)),
+        delay_seconds=float(L.get("naver", {}).get("delay_seconds", 2)),
+        market_enabled=bool(L.get("market", {}).get("enabled", True)),
+        market_months=int(L.get("market", {}).get("months", 3)),
+        state_path=Path(L.get("state_path", "state/listings.json")))
     return Settings(
         areas=areas,
         profile=profile,
@@ -60,6 +88,7 @@ def load(path: str | Path) -> Settings:
         lh=raw.get("lh", {}),
         state_path=Path(raw.get("state", {}).get("path", "state/seen.json")),
         mail_to=raw.get("mail", {}).get("to", ""),
+        listings=listings,
     )
 
 

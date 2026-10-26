@@ -5,13 +5,14 @@ import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 
-from . import mailer, runner
+from . import listing_mail, listing_runner, mailer, molit, runner
 from .applyhome import ApplyhomeSource
 from .config import MailEnv, load
-from .http import get_json, normalize_key
+from .http import get_json, get_text, normalize_key
 from .lh import DEFAULT_ENDPOINT, LhSource
 from .matcher import Match
 from .models import Notice
+from .realestate import NaverLandSource
 from .state import State
 
 KST = timezone(timedelta(hours=9))
@@ -40,11 +41,50 @@ def sample_entries(cfg, today: date) -> list[mailer.Entry]:
     return [mailer.Entry(Match(n, cfg.areas[0]))]
 
 
+def run_listings(cfg, args, today: date, service_key: str) -> int:
+    L = cfg.listings
+    if not L.enabled or not L.areas:
+        print("[listings] 비활성화되어 있거나 지역이 없습니다")
+        return 0
+    state = State(L.state_path)
+    src = NaverLandSource(get_json, get_text, L.criteria, L.areas, delay=L.delay_seconds)
+    found, errors = src.fetch()
+    res = listing_runner.select(found, state, max_items=L.max_items_per_mail)
+    res.errors = errors
+    print(f"기준일 {today} / 네이버부동산 조건 일치 {len(found)}건 / 신규 {len(res.new)}건"
+          + (" (첫 실행: 기준선)" if res.baseline else ""))
+    for err in errors:
+        print(f"  ! {err}", file=sys.stderr)
+
+    if res.new:
+        market = None
+        if L.market_enabled and service_key:
+            lawd = {a.lawd_cd for a in res.shown_areas() if a.lawd_cd}
+            market, merrs = molit.load_market(get_text, normalize_key(service_key), lawd, today,
+                                              months=L.market_months, area_min=L.criteria.area_min,
+                                              area_max=L.criteria.area_max)
+            res.errors += merrs
+            for err in merrs:
+                print(f"  ! {err}", file=sys.stderr)
+        if args.dry_run:
+            print("\n" + listing_mail.build_subject(res) + "\n")
+            print(listing_mail.build_text(res, L.criteria, market, today))
+        else:
+            env = MailEnv.from_env(cfg.mail_to)
+            mailer.send_smtp(listing_mail.build_message(res, L.criteria, market, today, env.user, env.to), env)
+            print(f"메일 발송 완료 -> {env.to}")
+    if not args.dry_run and res.new:
+        listing_runner.commit(res, state, today)
+        state.save(today, keep_days=180)
+    return 1 if res.errors else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="cheongyak_alert", description="별내동 인근 청약 공고 이메일 알림")
     ap.add_argument("--config", default="config.toml")
     ap.add_argument("--dry-run", action="store_true", help="조회·매칭 결과만 출력 (메일 발송·상태 저장 안 함)")
     ap.add_argument("--test-mail", action="store_true", help="샘플 메일을 보내 SMTP 설정을 확인")
+    ap.add_argument("--listings", action="store_true", help="청약 공고 대신 전세 매물(네이버부동산)을 조회")
     ap.add_argument("--today", help="기준일 YYYY-MM-DD (테스트용)")
     args = ap.parse_args(argv)
 
@@ -59,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     key = os.environ.get("DATA_GO_KR_SERVICE_KEY", "")
+    if args.listings:
+        return run_listings(cfg, args, today, key)
     if not key:
         print("환경변수 DATA_GO_KR_SERVICE_KEY 가 필요합니다 (공공데이터포털 일반 인증키)", file=sys.stderr)
         return 2
