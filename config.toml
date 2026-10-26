@@ -1,0 +1,50 @@
+# 별내동 인근 청약 알림 설정
+
+[search]
+lookback_days = 60          # 최근 며칠 이내 모집공고까지 조회할지
+include_closed = false      # 접수가 이미 끝난 공고도 알릴지
+remind_days_before = 1      # 접수 시작 N일 전(당일 포함)에 한 번 더 알림
+
+# 별내동에 가까울수록 rank가 작다. 공고명+주소에 keywords 중 하나라도 있으면 해당 지역으로 분류한다.
+[[areas]]
+name = "별내동"
+rank = 1
+keywords = ["별내"]
+
+[[areas]]
+name = "남양주시"
+rank = 2
+keywords = ["남양주"]
+
+[[areas]]
+name = "인근(구리·의정부)"
+rank = 3
+keywords = ["구리시", "갈매", "의정부시"]
+
+[[areas]]
+name = "경기북부 광역공고(대상 지역 확인 필요)"
+rank = 4
+keywords = ["경기북부", "경기 북부"]
+
+# 내 조건 체크 문구와 가점 추정에 쓰인다. 지우면 해당 문구는 메일에서 빠진다.
+[profile]
+birth_year = 1990
+married_on = "2018-05"                   # 혼인신고 연-월(일을 알면 2018-05-17 형식)
+children_born = ["2024-08", "2024-08"]   # 쌍둥이
+homeless = true                          # 가정값: 무주택세대구성원. 다르면 false
+extra_dependents = 0                     # 배우자·자녀 외 부양가족(직계존속 등) 수
+# account_open = "2016-01"               # 청약통장 가입 연-월. 넣으면 가점에 통장 점수 포함
+
+[applyhome]
+enabled = true
+region = "경기"
+special_supply_detail = true             # APT 공고의 특별공급 유형별 세대수 조회
+# endpoints = ["getAPTLttotPblancDetail"]  # 기본은 APT·무순위·오피스텔/도시형·공공지원민간임대·임의공급 전체
+
+[lh]
+enabled = true
+# endpoint = "https://apis.data.go.kr/B552555/lhNoticeInfo1/getNoticeInfo1"
+region_code = "41"                       # 경기도
+
+[state]
+path = "state/seen.json"
