@@ -7,6 +7,7 @@ remind_days_before = 1      # 접수 시작 N일 전(당일 포함)에 한 번 �
 
 [mail]
 to = "jos5324@gmail.com"          # 알림 수신 주소 (환경변수 MAIL_TO가 있으면 그쪽이 우선)
+fallback_issue = true             # SMTP 시크릿이 없으면 GitHub 이슈를 만들어 GitHub이 이메일로 알리게 함 (Actions 전용)
 
 # 별내동에 가까울수록 rank가 작다. 공고명+주소에 keywords 중 하나라도 있으면 해당 지역으로 분류한다.
 [[areas]]
@@ -78,6 +79,8 @@ rank = 1
 path = ["남양주시", "별내동"]
 lawd_cd = "41360"
 dong = "별내동"
+lat = 37.6437      # 지도 링크 중심 (대략값)
+lon = 127.1279
 
 [[listings.areas]]
 name = "다산동"
@@ -85,6 +88,8 @@ rank = 2
 path = ["남양주시", "다산동"]
 lawd_cd = "41360"
 dong = "다산동"
+lat = 37.61      # 지도 링크 중심 (대략값)
+lon = 127.15
 
 [[listings.areas]]
 name = "퇴계원읍"
@@ -92,6 +97,8 @@ rank = 2
 path = ["남양주시", "퇴계원읍"]
 lawd_cd = "41360"
 dong = "퇴계원읍"
+lat = 37.6485      # 지도 링크 중심 (대략값)
+lon = 127.1436
 
 [[listings.areas]]
 name = "구리 갈매동"
@@ -99,3 +106,5 @@ rank = 3
 path = ["구리시", "갈매동"]
 lawd_cd = "41310"
 dong = "갈매동"
+lat = 37.6339      # 지도 링크 중심 (대략값)
+lon = 127.1137

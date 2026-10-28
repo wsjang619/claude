@@ -43,6 +43,7 @@ class Settings:
     lh: dict = field(default_factory=dict)
     state_path: Path = Path("state/seen.json")
     mail_to: str = ""
+    fallback_issue: bool = True
     listings: ListingSettings = field(default_factory=ListingSettings)
 
 
@@ -72,7 +73,8 @@ def load(path: str | Path) -> Settings:
     listings = ListingSettings(
         enabled=bool(L.get("enabled", True)), criteria=criteria,
         areas=[ListingArea(a["name"], int(a["rank"]), tuple(a.get("path", ())), a.get("cortar_no", ""),
-                           a.get("lawd_cd", ""), a.get("dong", "")) for a in L.get("areas", [])],
+                           a.get("lawd_cd", ""), a.get("dong", ""), float(a.get("lat", 0)), float(a.get("lon", 0)))
+               for a in L.get("areas", [])],
         max_items_per_mail=int(L.get("max_items_per_mail", 30)),
         delay_seconds=float(L.get("naver", {}).get("delay_seconds", 2)),
         market_enabled=bool(L.get("market", {}).get("enabled", True)),
@@ -88,6 +90,7 @@ def load(path: str | Path) -> Settings:
         lh=raw.get("lh", {}),
         state_path=Path(raw.get("state", {}).get("path", "state/seen.json")),
         mail_to=raw.get("mail", {}).get("to", ""),
+        fallback_issue=bool(raw.get("mail", {}).get("fallback_issue", True)),
         listings=listings,
     )
 
@@ -99,6 +102,13 @@ class MailEnv:
     user: str
     password: str
     to: str
+
+    @classmethod
+    def optional(cls, default_to: str = "") -> "MailEnv | None":
+        """SMTP 시크릿이 없으면 None."""
+        if not (os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD")):
+            return None
+        return cls.from_env(default_to)
 
     @classmethod
     def from_env(cls, default_to: str = "") -> "MailEnv":

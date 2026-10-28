@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from .listing_runner import ListingResult
 from .molit import Market
-from .realestate import Criteria, Listing, fmt_money
+from .realestate import Criteria, Listing, fmt_money, land_search_url
 from .summary import fmt_date
 
 
@@ -64,6 +64,8 @@ def _intro(res: ListingResult, c: Criteria) -> str:
 def build_text(res: ListingResult, c: Criteria, market: Market | None, today: date) -> str:
     out = [_intro(res, c), ""]
     out += [f"[시세 참고] {x}" for x in _market_lines({l.area for l in res.shown}, market)]
+    out += ["지역별 전체 매물 보기 (네이버부동산)"] + [
+        f"  - {a.name}: {land_search_url(a, c)}" for a in sorted({l.area for l in res.shown}, key=lambda a: a.rank)] + [""]
     out += ["한눈에 보기"] + [f"  - {l.area.name} · {l.title} · {_headline(l)}" for l in res.shown] + [""]
     for l in res.shown:
         out += [f"[{l.area.name}] {l.title}", f"  {_headline(l)}"]
@@ -89,6 +91,10 @@ def build_html(res: ListingResult, c: Criteria, market: Market | None, today: da
         items = "".join(f"<li>{escape(x)}</li>" for x in lines)
         parts.append(f"<div style='background:#f8f9fa;border-radius:8px;padding:10px 16px;font-size:14px;margin-bottom:14px'>"
                      f"<b>시세 참고</b> <span style='color:#868e96'>(국토부 전세 실거래, 조건 면적)</span><ul style='margin:4px 0;padding-left:18px'>{items}</ul></div>")
+    area_links = " &nbsp;|&nbsp; ".join(
+        f"<a href='{escape(land_search_url(a, c), quote=True)}'>{escape(a.name)} 전체 매물</a>"
+        for a in sorted({l.area for l in res.shown}, key=lambda a: a.rank))
+    parts.append(f"<p style='font-size:14px'>{area_links}</p>")
     for l in res.shown:
         meta = " &nbsp;·&nbsp; ".join(escape(x) for x in (l.description, l.realtor and f"중개 {l.realtor}",
                                                           l.confirmed and f"확인 {fmt_date(l.confirmed)}") if x)

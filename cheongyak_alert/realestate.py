@@ -55,6 +55,15 @@ class ListingArea:
     cortar_no: str = ""              # 알고 있으면 이름 조회를 건너뜀
     lawd_cd: str = ""                # 국토부 실거래 조회용 시군구 코드 5자리
     dong: str = ""                   # 실거래에서 거를 법정동 이름
+    lat: float = 0.0                 # 지도 링크의 중심 좌표 (대략값이면 충분)
+    lon: float = 0.0
+
+
+def land_search_url(area: ListingArea, c: Criteria) -> str:
+    """네이버부동산 지도 화면 링크 (지역 중심, 매물유형, 전세). 가격·면적 필터는 화면에서 설정한다."""
+    if not (area.lat and area.lon):
+        return f"{LAND}/complexes"
+    return f"{LAND}/complexes?ms={area.lat},{area.lon},16&a={':'.join(c.types)}&b=B1&e=RETAIL"
 
 
 @dataclass

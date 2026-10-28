@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  issues: write      # SMTP 시크릿이 없을 때 알림을 이슈로 남기기 위해
 
 concurrency:
   group: state-commit
@@ -29,6 +30,7 @@ jobs:
       - name: 공고 조회 및 메일 발송
         env:
           DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}

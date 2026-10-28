@@ -11,8 +11,10 @@ class State:
     def __init__(self, path: Path):
         self.path = path
         self.seen: dict[str, dict] = {}
+        self.meta: dict[str, str] = {}
         if path.exists():
-            self.seen = json.loads(path.read_text(encoding="utf-8")).get("seen", {})
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.seen, self.meta = data.get("seen", {}), data.get("meta", {})
 
     def is_seen(self, key: str) -> bool:
         return key in self.seen
@@ -27,9 +29,15 @@ class State:
         if key in self.seen:
             self.seen[key]["reminded"] = True
 
+    def sent_today(self, name: str, today: date) -> bool:
+        return self.meta.get(name) == today.isoformat()
+
+    def mark_sent(self, name: str, today: date) -> None:
+        self.meta[name] = today.isoformat()
+
     def save(self, today: date, keep_days: int = 400) -> None:
         cutoff = (today - timedelta(days=keep_days)).isoformat()
         self.seen = {k: v for k, v in self.seen.items() if v.get("first_seen", "9999") >= cutoff}
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"seen": self.seen}, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        self.path.write_text(json.dumps({"seen": self.seen, "meta": self.meta}, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
                              encoding="utf-8")
